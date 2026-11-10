@@ -1,0 +1,80 @@
+## Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## VS/Rider
+.vs/
+.idea/
+*.swp
+*~
+
+## .NET
+project.lock.json
+project.fragment.lock.json
+artifacts/
+publish/
+*.publishsettings
+
+## Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+*.coveragexml
+
+## MSBuild / Visual Studio build artifacts
+*.binlog
+*.tlog
+*.psess
+*.vsp
+*.vspx
+.vshistory/
+
+## NuGet
+*.nupkg
+*.snupkg
+
+## Benchmarks
+BenchmarkDotNet.Artifacts/
+
+## SQLite / local DB
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+*.db.bak
+*.db3
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
+
+## Logs / runtime
+logs/
+*.log
+
+## Environment / secrets
+appsettings.Development.json
+appsettings.Local.json
+secrets.json
+.env
+.env.*
+
+## Node/npm (se houver)
+node_modules/
+
+## OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store

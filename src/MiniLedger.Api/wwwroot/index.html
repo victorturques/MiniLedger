@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniLedger</title>
+    <link rel="stylesheet" href="css/styles.css?v=15">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+    <header>
+        <h1>MiniLedger</h1>
+        <div id="headerGuestActions" class="header-actions">
+            <button id="btnOpenCreate" class="header-btn">Criar conta</button>
+            <button id="btnOpenLogin" class="header-btn">Entrar na conta</button>
+        </div>
+        <div id="headerUserActions" class="header-actions" style="display: none;">
+            <button class="header-btn active" data-page="home">Início</button>
+            <button class="header-btn" data-page="deposit">Adicionar saldo</button>
+            <button class="header-btn" data-page="transfer">Transferências</button>
+            <button class="header-btn" data-page="statement">Extrato</button>
+            <button id="btnLogout" class="header-btn">Sair</button>
+        </div>
+        <a href="/swagger" target="_blank" class="swagger-link">Swagger</a>
+    </header>
+
+    <main>
+        <!-- Página Home / Conta -->
+        <section id="pageHome" class="page active">
+            <div id="homeLoggedOut" class="home-hero">
+               <div class="home-hero-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/>
+                    <path d="M3 7h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1 0-4h6"/>
+                    <circle cx="16.5" cy="12" r="0.6" fill="currentColor"/>
+                </svg>
+                </div>
+                <h2>Bem-vindo ao MiniLedger</h2>
+                <p>Seu banco simples, rápido e prático. Crie sua conta ou entre para gerenciar depósitos, transferências e extrato.</p>
+                <div class="home-hero-actions">
+                    <button id="heroCreate" class="hero-btn primary">Criar conta</button>
+                    <button id="heroLogin" class="hero-btn ghost">Entrar na conta</button>
+                </div>
+            </div>
+
+            <div id="homeLoggedIn" class="home-account" style="display: none;">
+                <div class="bank-card">
+                    <div class="bank-card-top">
+                        <span class="bank-card-brand">MiniLedger</span>
+                        <span class="bank-card-chip"></span>
+                    </div>
+
+                    <div>
+                        <div class="bank-card-label">Conta</div>
+                        <div class="bank-card-number-row">
+                            <div class="bank-card-number" id="homeAccountNumber">00000000</div>
+                            <button type="button" id="btnCopyAccount" class="copy-btn">Copiar</button>
+                        </div>
+                    </div>
+
+                    <div class="bank-card-bottom">
+                        <div>
+                            <div class="bank-card-label">Titular</div>
+                            <div class="bank-card-value" id="homeHolderName">-</div>
+                        </div>
+                        <div class="bank-card-balance">
+                            <div class="bank-card-label">Saldo</div>
+                            <div class="bank-card-value" id="homeBalance">R$ 0,00</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <button type="button" class="quick-action" data-page="deposit">
+                        <span class="quick-action-icon">＋</span>
+                        <span class="quick-action-label">Adicionar saldo</span>
+                    </button>
+                    <button type="button" class="quick-action" data-page="transfer">
+                        <span class="quick-action-icon">↗</span>
+                        <span class="quick-action-label">Transferir</span>
+                    </button>
+                    <button type="button" class="quick-action" data-page="statement">
+                        <span class="quick-action-icon">≡</span>
+                        <span class="quick-action-label">Extrato</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Página Adicionar Saldo -->
+        <section id="pageDeposit" class="page" style="display: none;">
+            <div class="page-card">
+                <h2>Adicionar saldo</h2>
+                <form id="depositPageForm">
+                    <label>
+                        Valor
+                        <input type="text" id="depositPageAmount" inputmode="numeric" maxlength="15" autocomplete="off" placeholder="R$ 0,00" required>
+                    </label>
+                    <button type="submit">Adicionar</button>
+                </form>
+                <div id="depositPageResult" class="result"></div>
+            </div>
+        </section>
+
+        <!-- Página Transferências -->
+        <section id="pageTransfer" class="page" style="display: none;">
+            <div class="page-card">
+                <h2>Transferências</h2>
+                <form id="transferPageForm">
+                    <label>
+                        Conta destino (8 dígitos)
+                        <input type="text" id="transferPageTo" maxlength="8" pattern="\d{8}" inputmode="numeric" placeholder="00000002" required>
+                    </label>
+                    <label>
+                        Valor
+                        <input type="text" id="transferPageAmount" inputmode="numeric" maxlength="15" autocomplete="off" placeholder="R$0,00" required>
+                    </label>
+                    <button type="submit">Transferir</button>
+                </form>
+                <div id="transferPageResult" class="result"></div>
+            </div>
+        </section>
+
+        <!-- Página Extrato -->
+        <section id="pageStatement" class="page" style="display: none;">
+            <div class="page-card">
+                <h2>Extrato</h2>
+                <div id="statementPageResult"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal Criar Conta -->
+    <div id="modalCreate" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Criar conta</h3>
+                <button class="modal-close" data-close="modalCreate">×</button>
+            </div>
+            <form id="modalCreateForm">
+                <label>
+                    Nome do titular
+                    <input type="text" id="modalCreateHolder" maxlength="150" required>
+                </label>
+                <label>
+                    Senha
+                    <input type="password" id="modalCreatePass" minlength="4" required>
+                </label>
+                <label>
+                    Confirmar senha
+                    <input type="password" id="modalCreatePass2" minlength="4" required>
+                </label>
+                <label>
+                    Saldo inicial (opcional)
+                    <input type="text" id="modalCreateBalance" inputmode="numeric" maxlength="15" autocomplete="off" placeholder="0,00">
+                </label>
+                <button type="submit">Criar conta</button>
+            </form>
+            <div id="modalCreateResult" class="result"></div>
+        </div>
+    </div>
+
+    <!-- Modal Entrar na conta -->
+    <div id="modalLogin" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Entrar na conta</h3>
+                <button class="modal-close" data-close="modalLogin">×</button>
+            </div>
+            <form id="modalLoginForm">
+                <label>
+                    Número da conta (8 dígitos)
+                    <input type="text" id="modalLoginAccount" maxlength="8" pattern="\d{8}" inputmode="numeric" required>
+                </label>
+                <label>
+                    Senha
+                    <input type="password" id="modalLoginPass" required>
+                </label>
+                <button type="submit">Entrar</button>
+            </form>
+            <div id="modalLoginResult" class="result"></div>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+    <script src="js/app.js?v=22"></script>
+</body>
+</html>
