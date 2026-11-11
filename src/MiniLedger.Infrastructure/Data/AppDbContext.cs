@@ -34,6 +34,13 @@ public class AppDbContext : DbContext, IAppDbContext
         }
     }
 
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        // Aplicado a toda propriedade DateTime, inclusive as que forem criadas depois:
+        // sem isso o fuso se perde no round-trip pelo SQLite.
+        configurationBuilder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
