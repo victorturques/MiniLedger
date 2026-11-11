@@ -10,6 +10,42 @@ function formatDate(dateString) {
     return date.toLocaleString('pt-BR');
 }
 
+// A API responde 401 sem corpo e, no rate limit, text/plain. Ler o texto antes de
+// converter evita "Unexpected end of JSON input" e permite tratar esses casos.
+async function readJson(response) {
+    const text = await response.text();
+    if (!text) return null;
+    try {
+        return JSON.parse(text);
+    } catch {
+        return null;
+    }
+}
+
+// Centraliza a escolha da mensagem exibida: validação, autorização, rate limit
+// e respostas sem corpo têm formatos diferentes.
+function apiErrorMessage(data, status, fallback, sessionExpired = false) {
+    if (status === 429) return 'Muitas tentativas. Tente novamente em instantes.';
+
+    if (Array.isArray(data)) {
+        const messages = data.map(err => err.errorMessage || err.ErrorMessage).filter(Boolean);
+        if (messages.length) return messages.join('<br>');
+    }
+    if (data && data.errors) {
+        const messages = Object.values(data.errors).flat().filter(Boolean);
+        if (messages.length) return messages.join('<br>');
+    }
+    if (data) {
+        const message = data.detail || data.error || data.title;
+        if (message) return message;
+    }
+
+    if (sessionExpired && (status === 401 || status === 403)) {
+        return 'Sessão expirada. Entre novamente.';
+    }
+    return fallback;
+}
+
 function getAuthHeaders() {
     const headers = { 'Content-Type': 'application/json' };
     const token = currentAccount?.token;
@@ -376,29 +412,40 @@ document.getElementById('modalCreateForm').addEventListener('submit', async (e) 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ holderName, password, confirmPassword, initialBalance })
         });
-        const data = await response.json();
+        const data = await readJson(response);
         if (response.ok) {
             resultDiv.classList.add('success');
             resultDiv.innerHTML = `<div>Conta criada! Número: <strong>${data.accountNumber}</strong></div>`;
-            saveCurrentAccount({
-                id: data.id,
-                holderName: data.holderName,
-                accountNumber: data.accountNumber,
-                balance: data.balance,
-                createdAt: data.createdAt
+
+            // A criação não devolve token; sem autenticar aqui a tela ficaria
+            // "logada" e toda ação seguinte cairia em 401.
+            const authResponse = await fetch('/api/accounts/access', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accountNumber: data.accountNumber, password })
             });
+            const auth = await readJson(authResponse);
+
+            if (auth && auth.token) {
+                saveCurrentAccount({
+                    id: data.id,
+                    holderName: data.holderName,
+                    accountNumber: data.accountNumber,
+                    balance: data.balance,
+                    createdAt: data.createdAt,
+                    token: auth.token
+                });
+            } else {
+                resultDiv.innerHTML = `<div>Conta criada! Número: <strong>${data.accountNumber}</strong><br>Entre com sua senha para começar.</div>`;
+            }
+
             setTimeout(() => {
                 closeModal('modalCreate');
                 showPage('pageHome');
             }, 600);
         } else {
             resultDiv.classList.add('error');
-            let msg = data.error || data.detail || JSON.stringify(data);
-            if (Array.isArray(data)) msg = data.map(err => err.errorMessage || err.ErrorMessage).join('<br>');
-            else if (data.errors) {
-                const errors = Object.values(data.errors).flat();
-                if (errors.length) msg = errors.join('<br>');
-            }
+            const msg = apiErrorMessage(data, response.status, 'Não foi possível criar a conta.');
             resultDiv.innerHTML = `<div><strong>Erro</strong><br>${msg}</div>`;
         }
     } catch (error) {
@@ -429,7 +476,7 @@ document.getElementById('modalLoginForm').addEventListener('submit', async (e) =
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ accountNumber, password })
         });
-        const data = await response.json();
+        const data = await readJson(response);
         if (response.ok) {
             resultDiv.classList.add('success');
             resultDiv.innerHTML = '<div>Acesso liberado</div>';
@@ -441,16 +488,7 @@ document.getElementById('modalLoginForm').addEventListener('submit', async (e) =
             }, 400);
         } else {
             resultDiv.classList.add('error');
-            let msg = 'Número da conta ou senha inválidos.';
-            if (response.status === 429) msg = 'Muitas tentativas. Tente novamente em instantes.';
-            else if (data.detail) msg = data.detail;
-            else if (data.error) msg = data.error;
-            else if (data.title) msg = data.title;
-            else if (Array.isArray(data)) msg = data.map(err => err.errorMessage || err.ErrorMessage).join('<br>');
-            else if (data.errors) {
-                const errors = Object.values(data.errors).flat();
-                if (errors.length) msg = errors.join('<br>');
-            }
+            const msg = apiErrorMessage(data, response.status, 'Número da conta ou senha inválidos.');
             resultDiv.innerHTML = `<div><strong>Acesso negado</strong><br>${msg}</div>`;
         }
     } catch (error) {
@@ -487,7 +525,7 @@ document.getElementById('depositPageForm').addEventListener('submit', async (e) 
             headers: getAuthHeaders(),
             body: JSON.stringify({ accountNumber: currentAccount.accountNumber, amount })
         });
-        const data = await response.json();
+        const data = await readJson(response);
         if (response.ok) {
             resultDiv.classList.add('success');
             resultDiv.innerHTML = `
@@ -504,12 +542,7 @@ document.getElementById('depositPageForm').addEventListener('submit', async (e) 
             showToast('Saldo adicionado com sucesso!', 'success');
         } else {
             resultDiv.classList.add('error');
-            let msg = data.error || data.detail || JSON.stringify(data);
-            if (Array.isArray(data)) msg = data.map(err => err.errorMessage || err.ErrorMessage).join('<br>');
-            else if (data.errors) {
-                const errors = Object.values(data.errors).flat();
-                if (errors.length) msg = errors.join('<br>');
-            }
+            const msg = apiErrorMessage(data, response.status, 'Não foi possível adicionar saldo.', true);
             resultDiv.innerHTML = `<div><strong>Não foi possível adicionar saldo</strong><br>${msg}</div>`;
             showToast('Não foi possível adicionar saldo', 'error');
         }
@@ -548,7 +581,7 @@ document.getElementById('transferPageForm').addEventListener('submit', async (e)
             headers: getAuthHeaders(),
             body: JSON.stringify({ fromAccountNumber: currentAccount.accountNumber, toAccountNumber: toAccount, amount })
         });
-        const data = await response.json();
+        const data = await readJson(response);
         if (response.ok) {
             resultDiv.classList.add('success');
             resultDiv.innerHTML = `
@@ -573,14 +606,7 @@ document.getElementById('transferPageForm').addEventListener('submit', async (e)
             showToast('Transferência realizada com sucesso!', 'success');
         } else {
             resultDiv.classList.add('error');
-            let msg = 'Não foi possível realizar a transferência.';
-            if (data.error) msg = data.error;
-            else if (data.detail) msg = data.detail;
-            else if (Array.isArray(data)) msg = data.map(err => err.errorMessage || err.ErrorMessage).join('<br>');
-            else if (data.errors) {
-                const errors = Object.values(data.errors).flat();
-                if (errors.length) msg = errors.join('<br>');
-            }
+            const msg = apiErrorMessage(data, response.status, 'Não foi possível realizar a transferência.', true);
             resultDiv.innerHTML = `<div>${msg}</div>`;
             showToast('Transferência não realizada', 'error');
         }
@@ -602,16 +628,18 @@ async function loadStatement() {
             headers: getAuthHeaders()
         });
         if (!response.ok) {
+            const data = await readJson(response);
+            const msg = apiErrorMessage(data, response.status, 'Não foi possível carregar o extrato agora.', true);
             resultDiv.innerHTML = `
                 <div class="empty-state">
-                    <div class="empty-state-icon">📄</div>
-                    <div class="empty-state-title">Nenhuma movimentação ainda</div>
-                    <div class="empty-state-subtitle">Assim que você fizer um depósito ou transferência, aparecerá aqui.</div>
+                    <div class="empty-state-icon">⚠️</div>
+                    <div class="empty-state-title">Não foi possível carregar o extrato</div>
+                    <div class="empty-state-subtitle">${msg}</div>
                 </div>
             `;
             return;
         }
-        const data = await response.json();
+        const data = await readJson(response);
         if (data) {
             const transactions = Array.isArray(data) ? data : (data.items || []);
             if (transactions.length === 0) {
@@ -664,9 +692,9 @@ async function loadStatement() {
     } catch (error) {
         resultDiv.innerHTML = `
             <div class="empty-state">
-                <div class="empty-state-icon">📄</div>
-                <div class="empty-state-title">Nenhuma movimentação ainda</div>
-                <div class="empty-state-subtitle">Assim que você fizer um depósito ou transferência, aparecerá aqui.</div>
+                <div class="empty-state-icon">⚠️</div>
+                <div class="empty-state-title">Não foi possível carregar o extrato</div>
+                <div class="empty-state-subtitle">Verifique sua conexão e tente novamente.</div>
             </div>
         `;
     }
@@ -678,14 +706,17 @@ async function refreshBalanceHome() {
         const response = await fetch(`/api/accounts/by-number/${currentAccount.accountNumber}`, {
             headers: getAuthHeaders()
         });
-        const data = await response.json();
-        if (response.ok) {
+        const data = await readJson(response);
+        if (response.ok && data) {
             currentAccount.balance = data.balance;
             try {
                 sessionStorage.setItem('miniLedger_currentAccount', JSON.stringify(currentAccount));
             } catch(e){}
             document.getElementById('homeBalance').textContent = formatCurrency(data.balance);
             renderHome();
+        } else if (response.status === 401) {
+            // Token expirado: manter a tela "logada" mostraria um saldo velho.
+            clearCurrentAccount();
         }
     } catch {}
 }

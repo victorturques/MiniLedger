@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using MiniLedger.Application.DTOs;
 using MiniLedger.Tests.Infrastructure;
 
@@ -44,6 +45,24 @@ public class RateLimitTests : IDisposable
         var blocked = await LoginAsync(client);
 
         Assert.Equal(HttpStatusCode.TooManyRequests, blocked.StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_429_Should_Return_Problem_Json_With_Friendly_Message()
+    {
+        using var client = CreateClient();
+
+        for (var attempt = 1; attempt <= 5; attempt++)
+            Assert.Equal(HttpStatusCode.Unauthorized, (await LoginAsync(client)).StatusCode);
+
+        var blocked = await LoginAsync(client);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, blocked.StatusCode);
+        Assert.Equal("application/problem+json", blocked.Content.Headers.ContentType?.MediaType);
+
+        var problem = JsonDocument.Parse(await blocked.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal(429, problem.GetProperty("status").GetInt32());
+        Assert.Contains("tentativas", problem.GetProperty("detail").GetString()!);
     }
 
     [Fact]
