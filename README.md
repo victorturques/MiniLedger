@@ -6,7 +6,7 @@ Mini banco digital de portfólio: API REST em ASP.NET Core com frontend integrad
 
 O objetivo do projeto é praticar o que raramente aparece em CRUD de tutorial: **consistência de saldo sob concorrência**, **idempotência em operações financeiras** e **autorização por dono do recurso**.
 
-**Demo ao vivo:** _em breve_
+**Demo ao vivo:** [clique aqui](https://miniledger.runasp.net)
 
 ## Testando em 30 segundos
 
