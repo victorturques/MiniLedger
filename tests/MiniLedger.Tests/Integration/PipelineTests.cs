@@ -101,6 +101,17 @@ public class PipelineTests : IClassFixture<MiniLedgerWebAppFactory>
     }
 
     [Fact]
+    public async Task Static_Files_Should_Not_Be_Cached_Without_Revalidation()
+    {
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/js/app.js");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoCache);
+    }
+
+    [Fact]
     public async Task Missing_Static_File_Should_Return_404()
     {
         using var client = CreateClient();

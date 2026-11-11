@@ -116,6 +116,10 @@ app.UseExceptionMiddleware();
 
 app.UseSerilogRequestLogging();
 
+// Antes dos arquivos estáticos: senão o HTML e o JS são servidos em HTTP enquanto
+// a API redireciona para HTTPS, e o navegador bloqueia a troca de origem (CORS).
+app.UseHttpsRedirection();
+
 app.UseIpRateLimiting();
 
 app.UseSwagger();
@@ -126,9 +130,15 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseDefaultFiles();
-app.UseStaticFiles();
-
-app.UseHttpsRedirection();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        // Sem isso o navegador pode manter index.html/app.js antigos após um deploy
+        // e continuar rodando uma versão que já foi corrigida.
+        ctx.Context.Response.Headers["Cache-Control"] = "no-cache, must-revalidate";
+    }
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
